@@ -60,10 +60,13 @@ question: |-
 (body)
 ```
 
-**Commit** — one commit per note, inside the worktree:
+**Commit and push** — one commit per note, inside the worktree, then push:
 
 ```sh
 git -C notes add <file> && git -C notes commit -m "note: <file name>"
+git -C notes push origin notes
 ```
 
-Never push the `notes` branch and never commit notes to `main`.
+If the push fails, say so in one line and carry on: the note is committed, and
+the next push (or the next session's flush) carries it. Never commit notes to
+`main`.

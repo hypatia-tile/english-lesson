@@ -2,16 +2,17 @@
 
 Claude Code skills for asking questions about English quickly, without worrying
 about duplicates. Answers are saved as Markdown notes and published to public
-gists; this repository keeps no learning history.
+gists; `main` keeps no learning history.
 
 ## How it works
 
 - `main` holds only the skills and the machinery that runs them.
-- Notes are written to `notes/`, a worktree of the local-only orphan branch
-  `notes`. It is never pushed.
+- Notes are written to `notes/`, a worktree of the orphan branch `notes`,
+  which is pushed after every note. Its tip shows the notes of the last few
+  days; flushed notes leave the tip but stay in its history.
 - On every Claude Code session start, a hook runs `scripts/flush`, which
-  uploads notes 3 or more days old (JST calendar days) to a new public gist and
-  removes them from `notes`. On failure the notes stay and the next session
+  uploads notes 3 or more days old (JST calendar days) to a new public gist,
+  removes them from `notes` and pushes the branch. On failure the notes stay and the next session
   retries.
 
 Requirements: `git` 2.42+, an authenticated `gh`.

@@ -2,6 +2,8 @@
 # Flush notes that are 3 or more days old (JST calendar days) to a new public gist.
 #
 # - Bootstraps the `notes` orphan branch and its worktree at ./notes if missing.
+# - Pushes `notes` on every exit, so removals and earlier failed pushes reach
+#   origin.
 # - Never blocks: any failure prints a warning and exits 0, so the files stay
 #   and the next session retries.
 set -uo pipefail
@@ -30,6 +32,13 @@ bootstrap() {
 }
 
 bootstrap || { warn "could not set up the $BRANCH worktree at $notes_dir"; exit 0; }
+
+push_notes() {
+  git -C "$notes_dir" rev-parse --verify --quiet HEAD >/dev/null || return 0
+  git -C "$notes_dir" push --quiet origin "$BRANCH" 2>/dev/null \
+    || warn "could not push $BRANCH; the next session retries"
+}
+trap push_notes EXIT
 
 today=$(date +%Y%m%d)
 today_epoch=$(to_epoch "$today") || { warn "cannot parse dates"; exit 0; }
