@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Flush notes that are 3 or more days old (JST calendar days) to a new public gist.
+#
+# - Bootstraps the `notes` orphan branch and its worktree at ./notes if missing.
+# - Never blocks: any failure prints a warning and exits 0, so the files stay
+#   and the next session retries.
+set -uo pipefail
+
+export TZ=Asia/Tokyo
+readonly MIN_AGE_DAYS=3
+readonly BRANCH=notes
+
+repo_root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel) || exit 0
+notes_dir="$repo_root/notes"
+
+warn() { echo "flush: $*"; }
+
+# YYYYMMDD -> epoch seconds at local midnight (GNU or BSD date).
+to_epoch() {
+  date -d "$1" +%s 2>/dev/null || date -j -f %Y%m%d%H%M%S "${1}000000" +%s 2>/dev/null
+}
+
+bootstrap() {
+  [ -e "$notes_dir/.git" ] && return 0
+  if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+    git -C "$repo_root" worktree add --quiet "$notes_dir" "$BRANCH"
+  else
+    git -C "$repo_root" worktree add --quiet --orphan -b "$BRANCH" "$notes_dir"
+  fi
+}
+
+bootstrap || { warn "could not set up the $BRANCH worktree at $notes_dir"; exit 0; }
+
+today=$(date +%Y%m%d)
+today_epoch=$(to_epoch "$today") || { warn "cannot parse dates"; exit 0; }
+
+due=()
+for f in "$notes_dir"/*.md; do
+  [ -e "$f" ] || continue
+  name=$(basename "$f")
+  stamp=${name%%T*}
+  [[ $stamp =~ ^[0-9]{8}$ ]] || { warn "skipping unrecognised file name: $name"; continue; }
+  epoch=$(to_epoch "$stamp") || continue
+  if (( (today_epoch - epoch) / 86400 >= MIN_AGE_DAYS )); then
+    due+=("$f")
+  fi
+done
+
+(( ${#due[@]} )) || exit 0
+
+command -v gh >/dev/null || { warn "gh not found; ${#due[@]} note(s) kept"; exit 0; }
+
+description="english-lesson $(date +%Y-%m-%d)"
+if ! url=$(gh gist create --public -d "$description" "${due[@]}" 2>&1); then
+  warn "gist upload failed; ${#due[@]} note(s) kept"
+  warn "$url"
+  exit 0
+fi
+
+rm -f "${due[@]}"
+git -C "$notes_dir" add -A . \
+  && { git -C "$notes_dir" diff --cached --quiet \
+       || git -C "$notes_dir" commit --quiet -m "flush: ${#due[@]} note(s) to $url"; } \
+  || warn "uploaded but could not commit the removal in $notes_dir"
+
+echo "flush: uploaded ${#due[@]} note(s) to $url"
+exit 0
