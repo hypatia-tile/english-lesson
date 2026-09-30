@@ -21,6 +21,10 @@ Requirements: `git` 2.42+, an authenticated `gh`.
 Open Claude Code in this repository and ask anything about English. The `ask`
 skill classifies the question, answers it and saves a note.
 
+To read a technical article or paper, give Claude its URL, a PDF or the text.
+The `read` skill discusses it by quoting the exact passages, and saves your
+questions about its English as notes.
+
 ## Output contract
 
 This repository does not know how the gists are used. Consumers can rely on:
@@ -31,7 +35,7 @@ Find them with `gh gist list --public | grep 'english-lesson '`.
 **File name** — `<YYYYMMDDTHHMMSS>_<type>_<slug>.md`
 
 - timestamp: creation time in JST
-- `type`: `word`, `phrase`, `grammar`, `correction` or `compare`
+- `type`: `word`, `phrase`, `grammar`, `correction`, `compare` or `sentence`
   (more may be added)
 - `slug`: `[a-z0-9-]`, at most 50 characters
 
