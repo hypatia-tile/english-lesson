@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Import notes filed from claude.ai as GitHub issues into the notes branch.
+#
+# - Takes open issues labelled `note` that the authenticated gh user opened;
+#   the repository is public, so issues from anyone else are ignored.
+# - Names each file <issue creation time in JST>_<issue title>.md, commits it
+#   to `notes`, pushes, and closes the issue with a comment.
+# - Skips an issue whose number is already in the notes history, so a failed
+#   close never produces a duplicate.
+# - Never blocks: any failure prints a warning and exits 0; a skipped issue
+#   stays open and the next session retries.
+set -uo pipefail
+
+readonly BRANCH=notes
+readonly LABEL=note
+readonly HEADING='### Note'
+
+repo_root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel) || exit 0
+notes_dir="$repo_root/notes"
+cd "$repo_root" || exit 0
+
+warn() { echo "import: $*"; }
+
+[ -e "$notes_dir/.git" ] || { warn "no $BRANCH worktree; scripts/flush creates it"; exit 0; }
+command -v gh >/dev/null || { warn "gh not found"; exit 0; }
+
+if ! numbers=$(gh issue list --label "$LABEL" --state open --author @me \
+                 --json number --jq '.[].number' 2>&1); then
+  warn "could not list issues"
+  warn "$numbers"
+  exit 0
+fi
+
+imported=0
+for n in $numbers; do
+  if git -C "$notes_dir" log --fixed-strings --grep "(#$n)" -1 --format=%h 2>/dev/null | grep -q .; then
+    gh issue close "$n" --comment "Already imported." >/dev/null 2>&1 \
+      || warn "#$n: already imported but could not close it"
+    continue
+  fi
+
+  # First line: file name; the rest: issue body.
+  if ! out=$(gh issue view "$n" --json title,body,createdAt --jq \
+      '"\(.createdAt | fromdateiso8601 + 32400 | strftime("%Y%m%dT%H%M%S"))_\(.title).md", .body' 2>&1); then
+    warn "#$n: could not read the issue"
+    continue
+  fi
+  name=${out%%$'\n'*}
+  body=${out#*$'\n'}
+  body=${body//$'\r'/}
+  title=${name#*_}
+  title=${title%.md}
+
+  [[ $name =~ ^[0-9]{8}T[0-9]{6}_[a-z]+_[a-z0-9-]{1,50}\.md$ ]] \
+    || { warn "#$n: title must be <type>_<slug>, got: $title"; continue; }
+  [[ $body == "$HEADING"$'\n'* ]] \
+    || { warn "#$n: body was not written with the note template"; continue; }
+  content=${body#"$HEADING"$'\n'}
+  content=${content#"${content%%[!$'\n']*}"}
+  [[ $content == ---$'\n'* ]] \
+    || { warn "#$n: the note must start with its --- frontmatter"; continue; }
+  [ -e "$notes_dir/$name" ] && { warn "#$n: $name already exists"; continue; }
+
+  printf '%s\n' "$content" > "$notes_dir/$name"
+  if ! { git -C "$notes_dir" add "$name" \
+         && git -C "$notes_dir" commit --quiet -m "note: $name (#$n)"; }; then
+    rm -f "$notes_dir/$name"
+    warn "#$n: could not commit $name"
+    continue
+  fi
+  imported=$((imported + 1))
+  gh issue close "$n" --comment "Imported as \`$name\`." >/dev/null 2>&1 \
+    || warn "#$n: imported but could not close it; the next session closes it"
+done
+
+(( imported )) || exit 0
+
+git -C "$notes_dir" push --quiet origin "$BRANCH" 2>/dev/null \
+  || warn "could not push $BRANCH; the next session retries"
+echo "import: imported $imported note(s)"
+exit 0

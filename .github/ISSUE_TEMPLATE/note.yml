@@ -1,0 +1,12 @@
+name: Note
+description: A note written on claude.ai, imported into the notes branch by scripts/import.
+title: "<type>_<slug>"
+labels: [note]
+body:
+  - type: textarea
+    id: note
+    attributes:
+      label: Note
+      description: The whole note — frontmatter and body — as Claude gave it.
+    validations:
+      required: true

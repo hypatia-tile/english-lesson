@@ -2,7 +2,8 @@
 
 Claude Code skills for asking questions about English quickly, without worrying
 about duplicates. Answers are saved as Markdown notes and published to public
-gists; `main` keeps no learning history.
+gists; `main` keeps no learning history. The skills also work from claude.ai,
+e.g. on a phone.
 
 ## How it works
 
@@ -12,8 +13,11 @@ gists; `main` keeps no learning history.
   days; flushed notes leave the tip but stay in its history.
 - On every Claude Code session start, a hook runs `scripts/flush`, which
   uploads notes 3 or more days old (JST calendar days) to a new public gist,
-  removes them from `notes` and pushes the branch. On failure the notes stay and the next session
-  retries.
+  removes them from `notes` and pushes the branch. On failure the notes stay
+  and the next session retries.
+- The same hook then runs `scripts/import`, which turns `note` issues filed
+  from claude.ai into notes and closes them. Closed issues stay as a history
+  of what was asked; the skills never read them.
 
 Requirements: `git` 2.42+, an authenticated `gh`.
 
@@ -26,6 +30,8 @@ To read a technical article or paper, give Claude its URL, a PDF or the text.
 The `read` skill discusses it by quoting the exact passages, and saves your
 questions about its English as notes.
 
+To use both from claude.ai, see [docs/claude-web.md](docs/claude-web.md).
+
 ## Output contract
 
 This repository does not know how the gists are used. Consumers can rely on:
@@ -35,7 +41,7 @@ Find them with `gh gist list --public | grep 'english-lesson '`.
 
 **File name** — `<YYYYMMDDTHHMMSS>_<type>_<slug>.md`
 
-- timestamp: creation time in JST
+- timestamp: creation time in JST (for notes from claude.ai, the issue's)
 - `type`: `word`, `phrase`, `grammar`, `correction`, `compare` or `sentence`
   (more may be added)
 - `slug`: `[a-z0-9-]`, at most 50 characters
