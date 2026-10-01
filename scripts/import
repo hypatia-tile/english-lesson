@@ -76,6 +76,8 @@ done
 (( imported )) || exit 0
 
 git -C "$notes_dir" push --quiet origin "$BRANCH" 2>/dev/null \
+  || { git -C "$notes_dir" pull --rebase --quiet origin "$BRANCH" 2>/dev/null \
+       && git -C "$notes_dir" push --quiet origin "$BRANCH" 2>/dev/null; } \
   || warn "could not push $BRANCH; the next session retries"
 echo "import: imported $imported note(s)"
 exit 0

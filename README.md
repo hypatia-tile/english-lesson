@@ -30,7 +30,9 @@ To read a technical article or paper, give Claude its URL, a PDF or the text.
 The `read` skill discusses it by quoting the exact passages, and saves your
 questions about its English as notes.
 
-To use both from claude.ai, see [docs/claude-web.md](docs/claude-web.md).
+To use both from a phone, open this repository in Claude Code on the web; a
+plain claude.ai Project works too, through issues. See
+[docs/claude-web.md](docs/claude-web.md).
 
 ## Output contract
 

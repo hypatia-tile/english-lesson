@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Flush notes that are 3 or more days old (JST calendar days) to a new public gist.
 #
-# - Bootstraps the `notes` orphan branch and its worktree at ./notes if missing.
+# - Bootstraps the `notes` worktree at ./notes if missing, from origin's
+#   `notes` when there is one, else as a new orphan branch.
+# - Rebases `notes` onto origin first: notes are also pushed from elsewhere
+#   (Claude Code on the web, scripts/import), each in a file of its own.
 # - Pushes `notes` on every exit, so removals and earlier failed pushes reach
 #   origin.
 # - Never blocks: any failure prints a warning and exits 0, so the files stay
@@ -22,16 +25,35 @@ to_epoch() {
   date -d "$1" +%s 2>/dev/null || date -j -f %Y%m%d%H%M%S "${1}000000" +%s 2>/dev/null
 }
 
+fetch_notes() {
+  git -C "$repo_root" fetch --quiet origin "+$BRANCH:refs/remotes/origin/$BRANCH" 2>/dev/null
+}
+
 bootstrap() {
   [ -e "$notes_dir/.git" ] && return 0
   if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$BRANCH"; then
     git -C "$repo_root" worktree add --quiet "$notes_dir" "$BRANCH"
+  elif fetch_notes; then
+    git -C "$repo_root" worktree add --quiet -b "$BRANCH" "$notes_dir" "origin/$BRANCH"
   else
     git -C "$repo_root" worktree add --quiet --orphan -b "$BRANCH" "$notes_dir"
   fi
 }
 
+# Bring in notes pushed from elsewhere. Offline, or with no `notes` on origin
+# yet, there is nothing to do.
+sync() {
+  fetch_notes || return 0
+  if ! git -C "$notes_dir" rev-parse --verify --quiet HEAD >/dev/null; then
+    git -C "$notes_dir" reset --quiet --hard "origin/$BRANCH"
+  elif ! git -C "$notes_dir" rebase --quiet "origin/$BRANCH" 2>/dev/null; then
+    git -C "$notes_dir" rebase --abort 2>/dev/null
+    warn "could not rebase $BRANCH onto origin; push will fail until fixed"
+  fi
+}
+
 bootstrap || { warn "could not set up the $BRANCH worktree at $notes_dir"; exit 0; }
+sync
 
 push_notes() {
   git -C "$notes_dir" rev-parse --verify --quiet HEAD >/dev/null || return 0

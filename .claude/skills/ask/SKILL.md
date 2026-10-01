@@ -64,9 +64,12 @@ question: |-
 
 ```sh
 git -C notes add <file> && git -C notes commit -m "note: <file name>"
-git -C notes push origin notes
+git -C notes push origin notes \
+  || { git -C notes pull --rebase --quiet origin notes && git -C notes push origin notes; }
 ```
 
-If the push fails, say so in one line and carry on: the note is committed, and
-the next push (or the next session's flush) carries it. Never commit notes to
+Notes are pushed from more than one place, so a rejected push is normal: the
+retry rebases onto origin (every note is its own file, so this never
+conflicts). If it still fails, say so in one line and carry on: the note is
+committed, and the next session's flush pushes it. Never commit notes to
 `main`.
